@@ -1,0 +1,1833 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MapWeb - 服务器地图</title>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+            background: #1a1a1f;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ============ 顶部工具栏 ============ */
+        header {
+            background: #26262e;
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            z-index: 20;
+            flex-shrink: 0;
+        }
+
+        header h1 {
+            font-size: 16px;
+            margin: 0;
+            color: #7cb342;
+            white-space: nowrap;
+        }
+
+        .control {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+        }
+
+        select, input[type="number"], input[type="text"], input[type="password"], button {
+            background: #35353f;
+            color: #e0e0e0;
+            border: 1px solid #4a4a56;
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-size: 13px;
+            outline: none;
+        }
+
+        button {
+            cursor: pointer;
+            background: #4a7a2a;
+            border-color: #5a8a3a;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #5a8a3a;
+        }
+
+        button:active {
+            background: #3a6a1a;
+        }
+
+        button.secondary {
+            background: #3a3a46;
+            border-color: #4a4a56;
+        }
+
+        button.secondary:hover {
+            background: #4a4a56;
+        }
+
+        #status {
+            font-size: 12px;
+            color: #9a9aa5;
+            margin-left: auto;
+        }
+
+        /* ============ 2D/3D 切换 ============ */
+        #view-toggle {
+            background: #3a3a46;
+            border: 1px solid #4a4a56;
+        }
+
+        /* ============ 背包弹窗 ============ */
+        #inventory-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 60;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #inventory-modal.open {
+            display: flex;
+        }
+
+        #inventory-box {
+            background: #202028;
+            border: 1px solid #35353f;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 520px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #inventory-box .inv-header {
+            padding: 12px 16px;
+            background: #26262e;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #35353f;
+        }
+
+        #inventory-box .inv-header span {
+            font-size: 14px;
+            color: #7cb342;
+        }
+
+        #inventory-grid {
+            padding: 14px;
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 4px;
+            overflow-y: auto;
+        }
+
+        .inv-slot {
+            aspect-ratio: 1;
+            background: #2a2a34;
+            border: 1px solid #35353f;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #b0b0b8;
+            text-align: center;
+            padding: 2px;
+            overflow: hidden;
+            word-break: break-all;
+        }
+
+        .inv-slot.filled {
+            background: #3a4a2a;
+            border-color: #5a7a3a;
+            color: #d0e0c0;
+        }
+
+        .inv-empty-tip {
+            padding: 20px;
+            text-align: center;
+            color: #6a6a75;
+            font-size: 13px;
+        }
+
+        /* ============ 在线玩家 ============ */
+        #player-toggle {
+            background: #3a3a46;
+            border: 1px solid #4a4a56;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #player-toggle .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #5ac04a;
+            display: inline-block;
+        }
+
+        #player-panel {
+            position: fixed;
+            top: 52px;
+            right: 14px;
+            width: 300px;
+            max-height: 60vh;
+            background: #202028;
+            border: 1px solid #35353f;
+            border-radius: 8px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+            z-index: 40;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #player-panel.open {
+            display: flex;
+        }
+
+        #player-panel .panel-title {
+            padding: 8px 12px;
+            font-size: 13px;
+            color: #7cb342;
+            border-bottom: 1px solid #35353f;
+            flex-shrink: 0;
+        }
+
+        #player-list {
+            overflow-y: auto;
+            padding: 6px;
+        }
+
+        .player-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 8px;
+            border-radius: 6px;
+        }
+
+        .player-item:hover {
+            background: #2a2a34;
+        }
+
+        .player-item img {
+            width: 48px;
+            height: 48px;
+            border-radius: 4px;
+            image-rendering: pixelated;
+            background: #35353f;
+            flex-shrink: 0;
+        }
+
+        .player-avatar {
+            cursor: pointer;
+            transition: transform 0.15s;
+        }
+
+        .player-avatar:hover {
+            transform: scale(1.08);
+            box-shadow: 0 0 6px rgba(124, 179, 66, 0.6);
+        }
+
+        .player-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 0;
+        }
+
+        .player-name {
+            font-size: 13px;
+            color: #e0e0e0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .player-meta {
+            font-size: 11px;
+            color: #8a8a95;
+            line-height: 1.4;
+        }
+
+        .player-empty {
+            padding: 16px;
+            text-align: center;
+            color: #6a6a75;
+            font-size: 13px;
+        }
+
+        /* 玩家搜索框 */
+        #player-search {
+            margin: 8px;
+            width: calc(100% - 16px);
+        }
+
+        /* ============ 生物圆点叠加层 ============ */
+        #entity-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            transform-origin: center center;
+        }
+
+        .entity-dot {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(0, 0, 0, 0.5);
+        }
+
+        .entity-dot.friendly {
+            background: #4ac04a;
+        }
+
+        .entity-dot.neutral {
+            background: #e0c040;
+        }
+
+        .entity-dot.hostile {
+            background: #e04040;
+        }
+
+        /* 生物图例 */
+        #entity-legend {
+            position: absolute;
+            bottom: 8px;
+            left: 12px;
+            display: none;
+            gap: 12px;
+            font-size: 11px;
+            color: #b0b0b8;
+            background: rgba(20, 20, 26, 0.75);
+            padding: 5px 10px;
+            border-radius: 6px;
+            pointer-events: none;
+        }
+
+        #entity-legend .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        #entity-legend .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* 汉堡菜单按钮，仅手机端显示 */
+        #menu-toggle {
+            display: none;
+            background: #3a3a46;
+            border: 1px solid #4a4a56;
+            font-size: 18px;
+            padding: 4px 12px;
+            line-height: 1;
+        }
+
+        /* ============ 地图区 ============ */
+        #map-container {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #101014;
+            position: relative;
+            touch-action: none;
+        }
+
+        /* ============ 3D 视图 ============ */
+        #three-container {
+            flex: 1;
+            position: relative;
+            background: #0a0a10;
+            display: none;
+            overflow: hidden;
+        }
+
+        #three-container.active {
+            display: block;
+        }
+
+        #three-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #three-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 11px;
+            color: #5a5a65;
+            pointer-events: none;
+        }
+
+        #three-status {
+            position: absolute;
+            top: 10px;
+            left: 12px;
+            font-size: 12px;
+            color: #9a9aa5;
+            background: rgba(20, 20, 26, 0.75);
+            padding: 4px 10px;
+            border-radius: 6px;
+            pointer-events: none;
+        }
+
+        /* 材质包上传按钮 */
+        #texture-upload-btn {
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            font-size: 12px;
+            padding: 5px 12px;
+            z-index: 5;
+        }
+
+        #texture-info {
+            position: absolute;
+            top: 44px;
+            right: 12px;
+            font-size: 11px;
+            color: #8a8a95;
+            background: rgba(20, 20, 26, 0.75);
+            padding: 3px 8px;
+            border-radius: 4px;
+            pointer-events: none;
+            display: none;
+        }
+
+        #map-image {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            max-width: none;
+            transform-origin: center center;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        #empty-tip {
+            position: absolute;
+            color: #6a6a75;
+            font-size: 15px;
+            display: none;
+            pointer-events: none;
+        }
+
+        .zoom-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 11px;
+            color: #5a5a65;
+            pointer-events: none;
+        }
+
+        /* ============ 命令行面板 ============ */
+        #console-panel {
+            position: fixed;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 360px;
+            background: #202028;
+            border-left: 1px solid #35353f;
+            display: flex;
+            flex-direction: column;
+            z-index: 30;
+            transform: translateX(100%);
+            transition: transform 0.25s ease;
+        }
+
+        #console-panel.open {
+            transform: translateX(0);
+        }
+
+        .panel-header {
+            padding: 10px 14px;
+            background: #26262e;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #35353f;
+            flex-shrink: 0;
+        }
+
+        .panel-header span {
+            font-size: 14px;
+            color: #7cb342;
+        }
+
+        .panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .field label {
+            font-size: 12px;
+            color: #9a9aa5;
+        }
+
+        .field input {
+            width: 100%;
+        }
+
+        #console-output {
+            flex: 1;
+            min-height: 120px;
+            background: #14141a;
+            border: 1px solid #35353f;
+            border-radius: 4px;
+            padding: 8px;
+            font-family: Consolas, Monaco, monospace;
+            font-size: 12px;
+            color: #b0d0a0;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .hint {
+            font-size: 11px;
+            color: #6a6a75;
+            line-height: 1.5;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* 打开命令行面板的浮动按钮 */
+        #console-fab {
+            position: fixed;
+            right: 16px;
+            bottom: 16px;
+            z-index: 25;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            font-size: 20px;
+            padding: 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        /* ============ 手机端适配 ============ */
+        @media (max-width: 768px) {
+            header {
+                padding: 8px 10px;
+                gap: 8px;
+            }
+
+            header h1 {
+                font-size: 14px;
+            }
+
+            #menu-toggle {
+                display: block;
+                order: -1;
+            }
+
+            /* 手机端：控件默认隐藏，点菜单后展开 */
+            .control {
+                display: none;
+                width: 100%;
+            }
+
+            header.expanded .control {
+                display: flex;
+            }
+
+            #status {
+                width: 100%;
+                margin-left: 0;
+                order: 10;
+            }
+
+            /* 命令行面板手机端从底部弹出，占大半屏 */
+            #console-panel {
+                width: 100%;
+                top: auto;
+                height: 75%;
+                border-left: none;
+                border-top: 1px solid #35353f;
+                border-radius: 12px 12px 0 0;
+                transform: translateY(100%);
+            }
+
+            #console-panel.open {
+                transform: translateY(0);
+            }
+
+            #console-fab {
+                right: 12px;
+                bottom: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+<header id="header">
+    <button id="menu-toggle" title="菜单">☰</button>
+    <h1>MapWeb 地图</h1>
+
+    <div class="control">
+        <label for="world-select">世界：</label>
+        <select id="world-select"></select>
+    </div>
+
+    <div class="control">
+        <label for="interval-input">刷新（秒）：</label>
+        <input type="number" id="interval-input" min="1" max="300" value="5">
+        <button id="save-btn">保存</button>
+    </div>
+
+    <div class="control">
+        <button id="refresh-btn" class="secondary">立即刷新</button>
+    </div>
+
+    <button id="view-toggle" title="切换 2D / 3D">2D</button>
+
+    <button id="player-toggle" title="在线玩家">
+        <span class="dot"></span>
+        <span id="player-count">在线 0</span>
+    </button>
+
+    <span id="status">加载中…</span>
+</header>
+
+<div id="map-container">
+    <img id="map-image" alt="服务器地图" style="display:none;">
+    <div id="entity-layer"></div>
+    <div id="empty-tip">当前世界没有已加载的区块</div>
+    <div class="zoom-hint">滚轮/双指缩放 · 拖动平移</div>
+    <div id="entity-legend">
+        <span class="legend-item"><span class="legend-dot" style="background:#4ac04a;"></span>友好</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#e0c040;"></span>中立</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#e04040;"></span>敌对</span>
+    </div>
+</div>
+
+<div id="three-container">
+    <canvas id="three-canvas"></canvas>
+    <div id="three-status">3D 视图加载中…</div>
+    <div id="three-hint">左键拖动旋转 · 滚轮缩放 · 右键平移</div>
+    <button id="texture-upload-btn" class="secondary">上传材质包</button>
+    <div id="texture-info"></div>
+    <input type="file" id="texture-file-input" accept=".zip" style="display:none;">
+</div>
+
+<div id="player-panel">
+    <div class="panel-title">在线玩家</div>
+    <input type="text" id="player-search" placeholder="搜索玩家名…">
+    <div id="player-list"></div>
+</div>
+
+<div id="inventory-modal">
+    <div id="inventory-box">
+        <div class="inv-header">
+            <span id="inventory-title">玩家背包</span>
+            <button id="inventory-close" class="secondary" style="padding:2px 10px;">✕</button>
+        </div>
+        <div id="inventory-grid"></div>
+    </div>
+</div>
+
+<button id="console-fab" title="命令行">⌨</button>
+
+<div id="console-panel">
+    <div class="panel-header">
+        <span>网页命令行</span>
+        <button id="console-close" class="secondary" style="padding:2px 10px;">✕</button>
+    </div>
+    <div class="panel-body">
+        <!-- 登录区 -->
+        <div id="login-area">
+            <div class="field">
+                <label for="login-user">管理员用户名</label>
+                <input type="text" id="login-user" autocomplete="username">
+            </div>
+            <div class="field">
+                <label for="login-pass">密码</label>
+                <input type="password" id="login-pass" autocomplete="current-password">
+            </div>
+            <button id="login-btn" style="width:100%;margin-top:8px;">登录</button>
+            <div class="hint" style="margin-top:8px;">
+                账号需由服务器控制台创建：<br>
+                /mapweb admin add &lt;用户名&gt; &lt;密码&gt;
+            </div>
+        </div>
+
+        <!-- 命令区 -->
+        <div id="command-area" class="hidden" style="display:flex;flex-direction:column;gap:10px;flex:1;">
+            <div class="hint">已登录：<span id="current-user"></span>
+                <button id="logout-btn" class="secondary" style="padding:2px 8px;font-size:11px;margin-left:6px;">退出</button>
+            </div>
+            <div class="field">
+                <label for="command-input">命令（仅白名单内可执行）</label>
+                <input type="text" id="command-input" placeholder="例如：say 你好">
+            </div>
+            <button id="command-btn" style="width:100%;">执行命令</button>
+            <div id="console-output">等待操作…</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var currentWorld = null;
+    var refreshInterval = 5;
+    var timer = null;
+    var scale = 1;
+    var offsetX = 0, offsetY = 0;
+    var token = null;
+    var dragging = false;
+    var lastX = 0, lastY = 0;
+    var pinchStartDist = 0;
+    var pinchStartScale = 1;
+
+    var header = document.getElementById('header');
+    var menuToggle = document.getElementById('menu-toggle');
+    var worldSelect = document.getElementById('world-select');
+    var intervalInput = document.getElementById('interval-input');
+    var saveBtn = document.getElementById('save-btn');
+    var refreshBtn = document.getElementById('refresh-btn');
+    var statusEl = document.getElementById('status');
+    var mapImage = document.getElementById('map-image');
+    var emptyTip = document.getElementById('empty-tip');
+    var container = document.getElementById('map-container');
+
+    var consolePanel = document.getElementById('console-panel');
+    var consoleFab = document.getElementById('console-fab');
+    var consoleClose = document.getElementById('console-close');
+    var loginArea = document.getElementById('login-area');
+    var commandArea = document.getElementById('command-area');
+    var loginUser = document.getElementById('login-user');
+    var loginPass = document.getElementById('login-pass');
+    var loginBtn = document.getElementById('login-btn');
+    var logoutBtn = document.getElementById('logout-btn');
+    var currentUserEl = document.getElementById('current-user');
+    var commandInput = document.getElementById('command-input');
+    var commandBtn = document.getElementById('command-btn');
+    var consoleOutput = document.getElementById('console-output');
+
+    var playerToggle = document.getElementById('player-toggle');
+    var playerCountEl = document.getElementById('player-count');
+    var playerPanel = document.getElementById('player-panel');
+    var playerListEl = document.getElementById('player-list');
+    var playerSearch = document.getElementById('player-search');
+    var entityLayer = document.getElementById('entity-layer');
+    var entityLegend = document.getElementById('entity-legend');
+
+    var viewToggle = document.getElementById('view-toggle');
+    var inventoryModal = document.getElementById('inventory-modal');
+    var inventoryClose = document.getElementById('inventory-close');
+    var inventoryTitle = document.getElementById('inventory-title');
+    var inventoryGrid = document.getElementById('inventory-grid');
+
+    var allPlayers = [];
+    var entityEnabled = false;
+    var mapBounds = null;
+    var isometric = false;
+
+    // ============ 地图相关 ============
+    function loadWorlds() {
+        fetch('/api/worlds')
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                worldSelect.innerHTML = '';
+                var worlds = data.worlds || [];
+                if (worlds.length === 0) {
+                    statusEl.textContent = '没有可显示的世界';
+                    return;
+                }
+                for (var i = 0; i < worlds.length; i++) {
+                    var opt = document.createElement('option');
+                    opt.value = worlds[i];
+                    opt.textContent = worlds[i];
+                    worldSelect.appendChild(opt);
+                }
+                currentWorld = (data.default && worlds.indexOf(data.default) >= 0)
+                    ? data.default : worlds[0];
+                worldSelect.value = currentWorld;
+                refreshMap();
+            })
+            .catch(function () {
+                statusEl.textContent = '无法获取世界列表';
+            });
+    }
+
+    function loadConfig() {
+        fetch('/api/config')
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                refreshInterval = data.refreshInterval || 5;
+                intervalInput.value = refreshInterval;
+                intervalInput.min = data.min || 1;
+                intervalInput.max = data.max || 300;
+                startTimer();
+            })
+            .catch(function () {
+                startTimer();
+            });
+    }
+
+    function refreshMap() {
+        if (!currentWorld) {
+            return;
+        }
+        var url = '/map.png?world=' + encodeURIComponent(currentWorld)
+            + '&mode=' + (isometric ? 'iso' : 'top')
+            + '&t=' + Date.now();
+        var img = new Image();
+        img.onload = function () {
+            mapImage.src = url;
+            mapImage.style.display = 'block';
+            emptyTip.style.display = 'none';
+            statusEl.textContent = '世界：' + currentWorld + ' · ' + new Date().toLocaleTimeString();
+            // 地图尺寸变化后重新绘制生物圆点
+            loadEntities();
+        };
+        img.onerror = function () {
+            mapImage.style.display = 'none';
+            emptyTip.style.display = 'block';
+            statusEl.textContent = '世界：' + currentWorld + ' · 暂无数据';
+            entityLayer.innerHTML = '';
+        };
+        img.src = url;
+    }
+
+    function startTimer() {
+        if (timer) {
+            clearInterval(timer);
+        }
+        timer = setInterval(function () {
+            loadPlayers();
+            if (isometric) {
+                // 3D 模式下刷新 3D 视图
+                loadThreeView();
+            } else {
+                refreshMap();
+                loadEntities();
+            }
+        }, refreshInterval * 1000);
+    }
+
+    saveBtn.addEventListener('click', function () {
+        var val = parseInt(intervalInput.value, 10);
+        if (isNaN(val) || val < 1) {
+            statusEl.textContent = '刷新间隔不合法';
+            return;
+        }
+        fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'interval=' + encodeURIComponent(val)
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                refreshInterval = data.refreshInterval;
+                intervalInput.value = refreshInterval;
+                startTimer();
+                statusEl.textContent = '刷新间隔已更新为 ' + refreshInterval + ' 秒';
+            })
+            .catch(function () {
+                statusEl.textContent = '保存失败';
+            });
+    });
+
+    worldSelect.addEventListener('change', function () {
+        currentWorld = worldSelect.value;
+        refreshMap();
+    });
+
+    refreshBtn.addEventListener('click', refreshMap);
+
+    // ============ 在线玩家 ============
+    function loadPlayers() {
+        fetch('/api/players')
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data.enabled) {
+                    playerToggle.style.display = 'none';
+                    return;
+                }
+                playerToggle.style.display = 'flex';
+                playerCountEl.textContent = '在线 ' + data.count;
+                allPlayers = data.players || [];
+                renderPlayerList();
+            })
+            .catch(function () {
+                // 忽略玩家列表加载失败
+            });
+    }
+
+    function renderPlayerList() {
+        var keyword = (playerSearch.value || '').trim().toLowerCase();
+        var players = allPlayers;
+        if (keyword) {
+            players = allPlayers.filter(function (p) {
+                return p.name.toLowerCase().indexOf(keyword) >= 0;
+            });
+        }
+
+        if (players.length === 0) {
+            playerListEl.innerHTML = '<div class="player-empty">'
+                + (keyword ? '没有匹配的玩家' : '当前没有玩家在线') + '</div>';
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < players.length; i++) {
+            var p = players[i];
+            var avatar = 'https://mc-heads.net/avatar/' + encodeURIComponent(p.name) + '/48';
+            var meta = [];
+            if (p.world !== undefined) {
+                meta.push('世界：' + p.world);
+            }
+            if (p.x !== undefined) {
+                meta.push('坐标：' + p.x + ', ' + p.y + ', ' + p.z);
+            }
+            if (p.health !== undefined) {
+                meta.push('血量：' + p.health + ' / ' + p.maxHealth);
+            }
+            if (p.food !== undefined) {
+                meta.push('饱食度：' + p.food + ' / ' + p.maxFood);
+            }
+            var metaHtml = '';
+            for (var j = 0; j < meta.length; j++) {
+                metaHtml += '<div class="player-meta">' + escapeHtml(meta[j]) + '</div>';
+            }
+            html += '<div class="player-item">'
+                + '<img src="' + avatar + '" alt="' + escapeHtml(p.name) + '" '
+                + 'class="player-avatar" data-player="' + escapeHtml(p.name) + '" '
+                + 'title="点击查看背包" '
+                + 'onerror="this.onerror=null;this.src=\'https://mc-heads.net/avatar/MHF_Steve/48\';">'
+                + '<div class="player-info">'
+                + '<div class="player-name">' + escapeHtml(p.name) + '</div>'
+                + metaHtml
+                + '</div></div>';
+        }
+        playerListEl.innerHTML = html;
+    }
+
+    function escapeHtml(s) {
+        if (s === undefined || s === null) {
+            return '';
+        }
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    playerToggle.addEventListener('click', function (e) {
+        e.stopPropagation();
+        playerPanel.classList.toggle('open');
+    });
+
+    // 玩家搜索
+    playerSearch.addEventListener('input', renderPlayerList);
+
+    // 点击玩家头像查看背包（事件委托）
+    playerListEl.addEventListener('click', function (e) {
+        var avatar = e.target.closest ? e.target.closest('.player-avatar') : null;
+        if (avatar) {
+            openInventory(avatar.getAttribute('data-player'));
+        }
+    });
+
+    // ============ 2D / 3D 切换 ============
+    viewToggle.addEventListener('click', function () {
+        isometric = !isometric;
+        if (isometric) {
+            // 切到 3D
+            viewToggle.textContent = '3D';
+            container.style.display = 'none';
+            threeContainer.classList.add('active');
+            // 等容器显示后再初始化，确保尺寸正确
+            setTimeout(function () {
+                if (threeReady) {
+                    var w = threeContainer.clientWidth;
+                    var h = threeContainer.clientHeight;
+                    threeCamera.aspect = w / h;
+                    threeCamera.updateProjectionMatrix();
+                    threeRenderer.setSize(w, h, false);
+                }
+                loadThreeView();
+            }, 50);
+        } else {
+            // 切回 2D
+            viewToggle.textContent = '2D';
+            threeContainer.classList.remove('active');
+            container.style.display = 'flex';
+            scale = 1;
+            offsetX = 0;
+            offsetY = 0;
+            applyTransform();
+            refreshMap();
+        }
+    });
+
+    // ============ 背包查看 ============
+    function openInventory(playerName) {
+        if (!token) {
+            alert('请先在命令行面板登录管理员账号');
+            return;
+        }
+        inventoryTitle.textContent = playerName + ' 的背包';
+        inventoryGrid.innerHTML = '<div class="inv-empty-tip">加载中…</div>';
+        inventoryModal.classList.add('open');
+
+        fetch('/api/inventory', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'token=' + encodeURIComponent(token) + '&player=' + encodeURIComponent(playerName)
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data.success) {
+                    inventoryGrid.innerHTML = '<div class="inv-empty-tip">'
+                        + escapeHtml(data.message || '读取失败') + '</div>';
+                    return;
+                }
+                renderInventory(data.items || []);
+            })
+            .catch(function () {
+                inventoryGrid.innerHTML = '<div class="inv-empty-tip">请求失败</div>';
+            });
+    }
+
+    function renderInventory(items) {
+        // 玩家背包 36 格（0-35 主背包 + 快捷栏）
+        var slotMap = {};
+        for (var i = 0; i < items.length; i++) {
+            slotMap[items[i].slot] = items[i];
+        }
+        var html = '';
+        for (var s = 0; s < 36; s++) {
+            var item = slotMap[s];
+            if (item) {
+                html += '<div class="inv-slot filled" title="' + escapeHtml(item.type) + '">'
+                    + escapeHtml(shortName(item.type)) + ' x' + item.amount + '</div>';
+            } else {
+                html += '<div class="inv-slot"></div>';
+            }
+        }
+        inventoryGrid.innerHTML = html;
+    }
+
+    function shortName(type) {
+        // 把 DIAMOND_SWORD 这类名字缩短显示
+        var name = type.replace(/_/g, ' ').toLowerCase();
+        return name.length > 12 ? name.substring(0, 12) : name;
+    }
+
+    inventoryClose.addEventListener('click', function () {
+        inventoryModal.classList.remove('open');
+    });
+
+    inventoryModal.addEventListener('click', function (e) {
+        if (e.target === inventoryModal) {
+            inventoryModal.classList.remove('open');
+        }
+    });
+
+    // ============ 生物显示 ============
+    function loadEntities() {
+        if (!currentWorld) {
+            return;
+        }
+        fetch('/api/entities?world=' + encodeURIComponent(currentWorld))
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                entityEnabled = !!data.enabled;
+                if (!entityEnabled) {
+                    entityLayer.innerHTML = '';
+                    entityLegend.style.display = 'none';
+                    return;
+                }
+                renderEntities(data);
+            })
+            .catch(function () {
+                // 忽略生物加载失败
+            });
+    }
+
+    function renderEntities(data) {
+        var entities = data.entities || [];
+        if (entities.length === 0 || data.mapWidth === undefined) {
+            entityLayer.innerHTML = '';
+            entityLegend.style.display = 'none';
+            return;
+        }
+
+        // 地图图片的实际渲染尺寸
+        var imgW = mapImage.offsetWidth;
+        var imgH = mapImage.offsetHeight;
+        if (imgW === 0 || imgH === 0) {
+            return;
+        }
+
+        // 让叠加层与地图图片尺寸、位置完全一致，共用同一个 transform
+        entityLayer.style.width = imgW + 'px';
+        entityLayer.style.height = imgH + 'px';
+        entityLayer.style.left = mapImage.offsetLeft + 'px';
+        entityLayer.style.top = mapImage.offsetTop + 'px';
+
+        var html = '';
+        for (var i = 0; i < entities.length; i++) {
+            var e = entities[i];
+            // 世界坐标 → 区块坐标 → 地图像素比例
+            var chunkX = Math.floor(e.x / 16);
+            var chunkZ = Math.floor(e.z / 16);
+            var relChunkX = chunkX - data.minChunkX;
+            var relChunkZ = chunkZ - data.minChunkZ;
+
+            // 每个区块占 1 像素，换算成叠加层内的百分比
+            var leftPct = (relChunkX + 0.5) / data.mapWidth * 100;
+            var topPct = (relChunkZ + 0.5) / data.mapHeight * 100;
+
+            html += '<div class="entity-dot ' + e.category + '" '
+                + 'style="left:' + leftPct + '%;top:' + topPct + '%;" '
+                + 'title="' + escapeHtml(e.type) + '"></div>';
+        }
+        entityLayer.innerHTML = html;
+        entityLegend.style.display = 'flex';
+    }
+
+    // 点击面板外部关闭
+    document.addEventListener('click', function (e) {
+        if (playerPanel.classList.contains('open')
+            && !playerPanel.contains(e.target)
+            && e.target !== playerToggle) {
+            playerPanel.classList.remove('open');
+        }
+    });
+
+    // 手机端菜单展开
+    menuToggle.addEventListener('click', function () {
+        header.classList.toggle('expanded');
+    });
+
+    // ============ 缩放与平移 ============
+    function applyTransform() {
+        var t = 'translate(' + offsetX + 'px,' + offsetY + 'px) scale(' + scale + ')';
+        mapImage.style.transform = t;
+        entityLayer.style.transform = t;
+    }
+
+    // 桌面端滚轮缩放
+    container.addEventListener('wheel', function (e) {
+        e.preventDefault();
+        if (e.deltaY < 0) {
+            scale = Math.min(scale * 1.2, 8);
+        } else {
+            scale = Math.max(scale / 1.2, 0.2);
+        }
+        applyTransform();
+    }, { passive: false });
+
+    // 桌面端拖动
+    container.addEventListener('mousedown', function (e) {
+        dragging = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        container.style.cursor = 'grabbing';
+    });
+    window.addEventListener('mouseup', function () {
+        dragging = false;
+        container.style.cursor = 'default';
+    });
+    window.addEventListener('mousemove', function (e) {
+        if (!dragging) {
+            return;
+        }
+        offsetX += e.clientX - lastX;
+        offsetY += e.clientY - lastY;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        applyTransform();
+    });
+
+    // 触屏：单指拖动，双指缩放
+    container.addEventListener('touchstart', function (e) {
+        if (e.touches.length === 1) {
+            dragging = true;
+            lastX = e.touches[0].clientX;
+            lastY = e.touches[0].clientY;
+        } else if (e.touches.length === 2) {
+            dragging = false;
+            pinchStartDist = touchDistance(e.touches[0], e.touches[1]);
+            pinchStartScale = scale;
+        }
+    }, { passive: false });
+
+    container.addEventListener('touchmove', function (e) {
+        e.preventDefault();
+        if (e.touches.length === 1 && dragging) {
+            offsetX += e.touches[0].clientX - lastX;
+            offsetY += e.touches[0].clientY - lastY;
+            lastX = e.touches[0].clientX;
+            lastY = e.touches[0].clientY;
+            applyTransform();
+        } else if (e.touches.length === 2) {
+            var dist = touchDistance(e.touches[0], e.touches[1]);
+            if (pinchStartDist > 0) {
+                scale = Math.max(0.2, Math.min(8, pinchStartScale * (dist / pinchStartDist)));
+                applyTransform();
+            }
+        }
+    }, { passive: false });
+
+    container.addEventListener('touchend', function () {
+        dragging = false;
+        pinchStartDist = 0;
+    });
+
+    function touchDistance(t1, t2) {
+        var dx = t1.clientX - t2.clientX;
+        var dy = t1.clientY - t2.clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    // ============ 命令行面板 ============
+    consoleFab.addEventListener('click', function () {
+        consolePanel.classList.add('open');
+    });
+    consoleClose.addEventListener('click', function () {
+        consolePanel.classList.remove('open');
+    });
+
+    function log(text) {
+        consoleOutput.textContent += '\n' + text;
+        consoleOutput.scrollTop = consoleOutput.scrollHeight;
+    }
+
+    loginBtn.addEventListener('click', function () {
+        var user = loginUser.value.trim();
+        var pass = loginPass.value;
+        if (!user || !pass) {
+            log('请填写用户名和密码');
+            return;
+        }
+        fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'username=' + encodeURIComponent(user) + '&password=' + encodeURIComponent(pass)
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (data.success) {
+                    token = data.token;
+                    currentUserEl.textContent = user;
+                    loginArea.classList.add('hidden');
+                    commandArea.classList.remove('hidden');
+                    log('登录成功，欢迎 ' + user);
+                } else {
+                    log('登录失败：' + (data.message || '未知错误'));
+                }
+            })
+            .catch(function () {
+                log('登录请求失败');
+            });
+    });
+
+    logoutBtn.addEventListener('click', function () {
+        if (token) {
+            fetch('/api/logout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'token=' + encodeURIComponent(token)
+            });
+        }
+        token = null;
+        loginArea.classList.remove('hidden');
+        commandArea.classList.add('hidden');
+        log('已退出登录');
+    });
+
+    commandBtn.addEventListener('click', function () {
+        var cmd = commandInput.value.trim();
+        if (!cmd) {
+            return;
+        }
+        if (!token) {
+            log('请先登录');
+            return;
+        }
+        fetch('/api/console', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'token=' + encodeURIComponent(token) + '&command=' + encodeURIComponent(cmd)
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (data.success) {
+                    log('> ' + cmd + '  →  ' + (data.message || '已执行'));
+                } else {
+                    log('> ' + cmd + '  →  失败：' + (data.message || '未知错误'));
+                }
+                if (data.output) {
+                    log(data.output.replace(/\n$/, ''));
+                }
+                commandInput.value = '';
+            })
+            .catch(function () {
+                log('命令请求失败');
+            });
+    });
+
+    commandInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            commandBtn.click();
+        }
+    });
+
+    // ============ 真 3D 视图（Three.js） ============
+    var threeContainer = document.getElementById('three-container');
+    var threeCanvas = document.getElementById('three-canvas');
+    var threeStatus = document.getElementById('three-status');
+
+    var threeScene = null;
+    var threeCamera = null;
+    var threeRenderer = null;
+    var threeVoxelMesh = null;
+    var threeEntityGroup = null;
+    var threeReady = false;
+    var threeAnimating = false;
+
+    // 相机轨道参数
+    var camTheta = Math.PI / 4;
+    var camPhi = Math.PI / 3;
+    var camRadius = 120;
+    var camTarget = { x: 0, y: 64, z: 0 };
+
+    function initThree() {
+        if (threeReady) {
+            return true;
+        }
+        if (typeof THREE === 'undefined') {
+            threeStatus.textContent = 'Three.js 加载失败，请检查网络';
+            return false;
+        }
+
+        threeScene = new THREE.Scene();
+        threeScene.background = new THREE.Color(0x0a0a10);
+
+        var w = threeContainer.clientWidth || 800;
+        var h = threeContainer.clientHeight || 600;
+
+        threeCamera = new THREE.PerspectiveCamera(60, w / h, 0.1, 2000);
+
+        threeRenderer = new THREE.WebGLRenderer({ canvas: threeCanvas, antialias: true });
+        threeRenderer.setSize(w, h, false);
+        threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // 光照
+        var ambient = new THREE.AmbientLight(0xffffff, 0.75);
+        threeScene.add(ambient);
+        var dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        dirLight.position.set(100, 200, 100);
+        threeScene.add(dirLight);
+
+        threeEntityGroup = new THREE.Group();
+        threeScene.add(threeEntityGroup);
+
+        bindThreeControls();
+        threeReady = true;
+        return true;
+    }
+
+    function updateCamera() {
+        if (!threeCamera) {
+            return;
+        }
+        var x = camTarget.x + camRadius * Math.sin(camPhi) * Math.cos(camTheta);
+        var y = camTarget.y + camRadius * Math.cos(camPhi);
+        var z = camTarget.z + camRadius * Math.sin(camPhi) * Math.sin(camTheta);
+        threeCamera.position.set(x, y, z);
+        threeCamera.lookAt(camTarget.x, camTarget.y, camTarget.z);
+    }
+
+    function bindThreeControls() {
+        var dragging = false;
+        var button = 0;
+        var lastX = 0, lastY = 0;
+
+        threeCanvas.addEventListener('mousedown', function (e) {
+            dragging = true;
+            button = e.button;
+            lastX = e.clientX;
+            lastY = e.clientY;
+        });
+        window.addEventListener('mouseup', function () {
+            dragging = false;
+        });
+        window.addEventListener('mousemove', function (e) {
+            if (!dragging) {
+                return;
+            }
+            var dx = e.clientX - lastX;
+            var dy = e.clientY - lastY;
+            lastX = e.clientX;
+            lastY = e.clientY;
+
+            if (button === 2) {
+                // 右键平移
+                camTarget.x -= dx * 0.3;
+                camTarget.z -= dy * 0.3;
+            } else {
+                // 左键旋转
+                camTheta -= dx * 0.01;
+                camPhi -= dy * 0.01;
+                camPhi = Math.max(0.1, Math.min(Math.PI - 0.1, camPhi));
+            }
+            updateCamera();
+        });
+        threeCanvas.addEventListener('contextmenu', function (e) {
+            e.preventDefault();
+        });
+        threeCanvas.addEventListener('wheel', function (e) {
+            e.preventDefault();
+            camRadius += e.deltaY * 0.1;
+            camRadius = Math.max(10, Math.min(600, camRadius));
+            updateCamera();
+        }, { passive: false });
+    }
+
+    // ============ 材质管理 ============
+    var textureCache = {};      // 贴图名 → THREE.Texture
+    var localTextures = {};     // 本地材质包：贴图名 → Blob
+    var textureUploadBtn = document.getElementById('texture-upload-btn');
+    var textureFileInput = document.getElementById('texture-file-input');
+    var textureInfo = document.getElementById('texture-info');
+
+    // 从服务端加载材质清单和贴图
+    function loadServerTextures() {
+        fetch('/api/textures/manifest')
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data.loaded) {
+                    textureInfo.style.display = 'block';
+                    textureInfo.textContent = '服务端无材质包，使用纯色';
+                    return;
+                }
+                var names = data.textures || [];
+                textureInfo.style.display = 'block';
+                textureInfo.textContent = '服务端材质 ' + names.length + ' 个';
+                var loader = new THREE.TextureLoader();
+                for (var i = 0; i < names.length; i++) {
+                    (function (name) {
+                        loader.load('/api/textures/' + encodeURIComponent(name) + '.png',
+                            function (tex) {
+                                tex.magFilter = THREE.NearestFilter;
+                                tex.minFilter = THREE.NearestFilter;
+                                textureCache[name] = tex;
+                            },
+                            undefined,
+                            function () {
+                                // 单个贴图加载失败忽略
+                            });
+                    })(names[i]);
+                }
+            })
+            .catch(function () {
+                // 忽略
+            });
+    }
+
+    // 从 IndexedDB 加载本地材质包
+    function loadLocalTextures() {
+        if (!window.indexedDB) {
+            return;
+        }
+        var req = indexedDB.open('mapweb-textures', 1);
+        req.onupgradeneeded = function (e) {
+            var db = e.target.result;
+            if (!db.objectStoreNames.contains('textures')) {
+                db.createObjectStore('textures');
+            }
+        };
+        req.onsuccess = function (e) {
+            var db = e.target.result;
+            try {
+                var tx = db.transaction('textures', 'readonly');
+                var store = tx.objectStore('textures');
+                var getAll = store.getAllKeys();
+                getAll.onsuccess = function () {
+                    var keys = getAll.result || [];
+                    if (keys.length === 0) {
+                        return;
+                    }
+                    var getReq = store.getAll();
+                    getReq.onsuccess = function () {
+                        var values = getReq.result || [];
+                        var loader = new THREE.TextureLoader();
+                        for (var i = 0; i < keys.length; i++) {
+                            (function (name, blob) {
+                                var url = URL.createObjectURL(blob);
+                                loader.load(url, function (tex) {
+                                    tex.magFilter = THREE.NearestFilter;
+                                    tex.minFilter = THREE.NearestFilter;
+                                    textureCache[name] = tex;
+                                });
+                            })(keys[i], values[i]);
+                        }
+                        textureInfo.style.display = 'block';
+                        textureInfo.textContent = '本地材质 ' + keys.length + ' 个（覆盖服务端）';
+                    };
+                };
+            } catch (err) {
+                // 忽略
+            }
+        };
+    }
+
+    // 上传材质包
+    textureUploadBtn.addEventListener('click', function () {
+        textureFileInput.click();
+    });
+
+    textureFileInput.addEventListener('change', function () {
+        var file = textureFileInput.files[0];
+        if (!file) {
+            return;
+        }
+        if (!file.name.toLowerCase().endsWith('.zip')) {
+            alert('只支持 zip 格式的材质包');
+            return;
+        }
+        if (file.size > 50 * 1024 * 1024) {
+            alert('材质包不能超过 50MB');
+            return;
+        }
+        textureInfo.style.display = 'block';
+        textureInfo.textContent = '正在解析材质包…';
+
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            if (typeof JSZip === 'undefined') {
+                textureInfo.textContent = 'JSZip 加载失败';
+                return;
+            }
+            JSZip.loadAsync(e.target.result).then(function (zip) {
+                var prefix = 'assets/minecraft/textures/blocks/';
+                var tasks = [];
+                var count = 0;
+                zip.forEach(function (path, entry) {
+                    if (entry.dir) {
+                        return;
+                    }
+                    if (path.indexOf(prefix) !== 0 || !path.endsWith('.png')) {
+                        return;
+                    }
+                    var name = path.substring(prefix.length, path.length - 4);
+                    tasks.push(entry.async('blob').then(function (blob) {
+                        localTextures[name] = blob;
+                        count++;
+                    }));
+                });
+                Promise.all(tasks).then(function () {
+                    saveLocalTextures(localTextures);
+                    applyLocalTextures(localTextures);
+                    textureInfo.textContent = '本地材质 ' + count + ' 个（覆盖服务端）';
+                });
+            }).catch(function () {
+                textureInfo.textContent = '材质包解析失败';
+            });
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    // 保存到 IndexedDB
+    function saveLocalTextures(textures) {
+        if (!window.indexedDB) {
+            return;
+        }
+        var req = indexedDB.open('mapweb-textures', 1);
+        req.onupgradeneeded = function (e) {
+            var db = e.target.result;
+            if (!db.objectStoreNames.contains('textures')) {
+                db.createObjectStore('textures');
+            }
+        };
+        req.onsuccess = function (e) {
+            var db = e.target.result;
+            try {
+                var tx = db.transaction('textures', 'readwrite');
+                var store = tx.objectStore('textures');
+                store.clear();
+                for (var name in textures) {
+                    if (textures.hasOwnProperty(name)) {
+                        store.put(textures[name], name);
+                    }
+                }
+            } catch (err) {
+                // 忽略
+            }
+        };
+    }
+
+    // 应用本地材质（覆盖服务端）
+    function applyLocalTextures(textures) {
+        var loader = new THREE.TextureLoader();
+        for (var name in textures) {
+            if (!textures.hasOwnProperty(name)) {
+                continue;
+            }
+            (function (n, blob) {
+                var url = URL.createObjectURL(blob);
+                loader.load(url, function (tex) {
+                    tex.magFilter = THREE.NearestFilter;
+                    tex.minFilter = THREE.NearestFilter;
+                    textureCache[n] = tex;
+                });
+            })(name, textures[name]);
+        }
+    }
+
+    function loadThreeView() {
+        if (!initThree()) {
+            return;
+        }
+        if (!currentWorld) {
+            threeStatus.textContent = '请先选择世界';
+            return;
+        }
+
+        // 中心点：优先取第一个玩家所在区块，否则取世界出生点
+        var centerChunkX = 0;
+        var centerChunkZ = 0;
+        if (allPlayers.length > 0 && allPlayers[0].x !== undefined) {
+            centerChunkX = Math.floor(allPlayers[0].x / 16);
+            centerChunkZ = Math.floor(allPlayers[0].z / 16);
+        }
+
+        threeStatus.textContent = '正在加载 3D 数据…';
+
+        fetch('/api/voxels?world=' + encodeURIComponent(currentWorld)
+            + '&cx=' + centerChunkX + '&cz=' + centerChunkZ)
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data.success) {
+                    threeStatus.textContent = data.message || '加载失败';
+                    return;
+                }
+                renderThreeScene(data);
+            })
+            .catch(function () {
+                threeStatus.textContent = '3D 数据请求失败';
+            });
+    }
+
+    function renderThreeScene(data) {
+        // 清理旧内容
+        if (threeVoxelMesh) {
+            var oldMeshes = Array.isArray(threeVoxelMesh) ? threeVoxelMesh : [threeVoxelMesh];
+            for (var m = 0; m < oldMeshes.length; m++) {
+                threeScene.remove(oldMeshes[m]);
+                if (oldMeshes[m].geometry) {
+                    oldMeshes[m].geometry.dispose();
+                }
+                if (oldMeshes[m].material) {
+                    oldMeshes[m].material.dispose();
+                }
+            }
+            threeVoxelMesh = null;
+        }
+        while (threeEntityGroup.children.length > 0) {
+            threeEntityGroup.remove(threeEntityGroup.children[0]);
+        }
+
+        var voxels = data.voxels || [];
+        if (voxels.length === 0) {
+            threeStatus.textContent = '该区域没有方块数据';
+            return;
+        }
+
+        var centerX = data.centerX || 0;
+        var centerZ = data.centerZ || 0;
+
+        // 按材质分组：有贴图的按贴图名分组，无贴图的按颜色分组
+        var groups = {};
+        for (var i = 0; i < voxels.length; i++) {
+            var v = voxels[i];
+            var key;
+            if (v.t && textureCache[v.t]) {
+                key = 'tex:' + v.t;
+            } else {
+                key = 'color:' + v.c;
+            }
+            if (!groups[key]) {
+                groups[key] = { texture: v.t, color: v.c, list: [] };
+            }
+            groups[key].list.push(v);
+        }
+
+        var geometry = new THREE.BoxGeometry(1, 1, 1);
+        var dummy = new THREE.Object3D();
+        var color = new THREE.Color();
+        var meshes = [];
+
+        for (var key in groups) {
+            if (!groups.hasOwnProperty(key)) {
+                continue;
+            }
+            var group = groups[key];
+            var material;
+            if (group.texture && textureCache[group.texture]) {
+                var tex = textureCache[group.texture];
+                tex.magFilter = THREE.NearestFilter;
+                tex.minFilter = THREE.NearestFilter;
+                material = new THREE.MeshLambertMaterial({ map: tex });
+            } else {
+                material = new THREE.MeshLambertMaterial({ color: group.color });
+            }
+
+            var mesh = new THREE.InstancedMesh(geometry, material, group.list.length);
+            mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+            for (var k = 0; k < group.list.length; k++) {
+                var gv = group.list[k];
+                dummy.position.set(gv.x - centerX, gv.y, gv.z - centerZ);
+                dummy.updateMatrix();
+                mesh.setMatrixAt(k, dummy.matrix);
+            }
+            mesh.instanceMatrix.needsUpdate = true;
+            threeScene.add(mesh);
+            meshes.push(mesh);
+        }
+        threeVoxelMesh = meshes;
+
+        // 实体立体标记
+        var entities = data.entities || [];
+        for (var j = 0; j < entities.length; j++) {
+            var e = entities[j];
+            var ex = e.x - centerX;
+            var ez = e.z - centerZ;
+            var ey = e.y;
+
+            var markerColor = 0x4ac04a;
+            if (e.category === 'player') {
+                markerColor = 0x40a0ff;
+            } else if (e.category === 'neutral') {
+                markerColor = 0xe0c040;
+            } else if (e.category === 'hostile') {
+                markerColor = 0xe04040;
+            }
+
+            // 球体标记
+            var sphereGeo = new THREE.SphereGeometry(0.8, 8, 8);
+            var sphereMat = new THREE.MeshBasicMaterial({ color: markerColor });
+            var sphere = new THREE.Mesh(sphereGeo, sphereMat);
+            sphere.position.set(ex, ey + 1.5, ez);
+            threeEntityGroup.add(sphere);
+
+            // 垂直柱子（从地面连到实体，体现 Z 轴高度）
+            var pillarGeo = new THREE.CylinderGeometry(0.15, 0.15, ey + 1.5, 6);
+            var pillarMat = new THREE.MeshBasicMaterial({
+                color: markerColor,
+                transparent: true,
+                opacity: 0.5
+            });
+            var pillar = new THREE.Mesh(pillarGeo, pillarMat);
+            pillar.position.set(ex, (ey + 1.5) / 2, ez);
+            threeEntityGroup.add(pillar);
+        }
+
+        // 相机对准中心
+        camTarget.x = 0;
+        camTarget.y = 64;
+        camTarget.z = 0;
+        camRadius = 120;
+        updateCamera();
+
+        threeStatus.textContent = '方块 ' + voxels.length + ' · 实体 ' + entities.length;
+
+        if (!threeAnimating) {
+            threeAnimating = true;
+            animateThree();
+        }
+    }
+
+    function animateThree() {
+        if (!threeReady) {
+            threeAnimating = false;
+            return;
+        }
+        requestAnimationFrame(animateThree);
+        threeRenderer.render(threeScene, threeCamera);
+    }
+
+    window.addEventListener('resize', function () {
+        if (!threeReady || !threeContainer.classList.contains('active')) {
+            return;
+        }
+        var w = threeContainer.clientWidth;
+        var h = threeContainer.clientHeight;
+        threeCamera.aspect = w / h;
+        threeCamera.updateProjectionMatrix();
+        threeRenderer.setSize(w, h, false);
+    });
+
+    // 初始化
+    loadWorlds();
+    loadConfig();
+    loadPlayers();
+    loadEntities();
+    loadServerTextures();
+    loadLocalTextures();
+</script>
+</body>
+</html>

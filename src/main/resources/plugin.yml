@@ -1,0 +1,15 @@
+name: MapWeb
+version: '1.0.0'
+main: com.zip132sy.mapweb.MapWebPlugin
+api-version: '1.12'
+authors: ['zip132sy']
+description: '在服务器上启动内置网页服务，浏览器可查看当前已加载区块的实时俯视地图，支持网页配置刷新频率、多世界切换与网页命令行。'
+commands:
+  mapweb:
+    description: 'MapWeb 主命令，查看状态、端口、重载配置、管理网页管理员账号'
+    usage: '/mapweb <status|port|reload|admin>'
+    aliases: [mw]
+permissions:
+  mapweb.admin:
+    description: '允许使用 /mapweb 命令'
+    default: op
