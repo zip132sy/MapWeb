@@ -166,12 +166,36 @@
             padding: 2px;
             overflow: hidden;
             word-break: break-all;
+            position: relative;
         }
 
         .inv-slot.filled {
             background: #3a4a2a;
             border-color: #5a7a3a;
             color: #d0e0c0;
+        }
+
+        .inv-icon {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            image-rendering: pixelated;
+        }
+
+        .inv-text {
+            font-size: 9px;
+            line-height: 1.1;
+        }
+
+        .inv-count {
+            position: absolute;
+            right: 2px;
+            bottom: 1px;
+            font-size: 10px;
+            font-weight: bold;
+            color: #ffffff;
+            text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+            pointer-events: none;
         }
 
         .inv-empty-tip {
@@ -394,6 +418,7 @@
             width: 100%;
             height: 100%;
             display: block;
+            touch-action: none;
         }
 
         #three-hint {
@@ -440,9 +465,76 @@
             display: none;
         }
 
+        /* 强制上传材质包弹窗 */
+        #texture-required-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #texture-required-modal.open {
+            display: flex;
+        }
+
+        #texture-required-box {
+            background: #202028;
+            border: 1px solid #35353f;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 460px;
+            padding: 28px;
+            text-align: center;
+        }
+
+        #texture-required-box h2 {
+            margin: 0 0 12px;
+            font-size: 18px;
+            color: #e0c040;
+        }
+
+        #texture-required-box p {
+            margin: 0 0 8px;
+            font-size: 13px;
+            color: #9a9aa5;
+            line-height: 1.6;
+        }
+
+        #texture-required-box .note {
+            font-size: 11px;
+            color: #6a6a75;
+            margin-top: 12px;
+        }
+
+        #texture-required-upload {
+            margin-top: 18px;
+            padding: 10px 28px;
+            font-size: 14px;
+        }
+
+        #texture-required-status {
+            margin-top: 12px;
+            font-size: 12px;
+            color: #7cb342;
+            min-height: 16px;
+        }
+
         #map-image {
             image-rendering: pixelated;
             image-rendering: crisp-edges;
+            max-width: none;
+            transform-origin: center center;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        #map-canvas {
             max-width: none;
             transform-origin: center center;
             user-select: none;
@@ -455,6 +547,91 @@
             font-size: 15px;
             display: none;
             pointer-events: none;
+        }
+
+        /* ============ 加载动画 ============ */
+        .map-loader {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            width: 66px;
+            height: 66px;
+        }
+
+        .map-loader .cell {
+            background: #2a2a34;
+            border-radius: 3px;
+            animation: cellGlow 1.6s ease-in-out infinite;
+        }
+
+        .map-loader .cell:nth-child(1) { animation-delay: 0s; }
+        .map-loader .cell:nth-child(2) { animation-delay: 0.1s; }
+        .map-loader .cell:nth-child(3) { animation-delay: 0.2s; }
+        .map-loader .cell:nth-child(4) { animation-delay: 0.3s; }
+        .map-loader .cell:nth-child(5) { animation-delay: 0.4s; }
+        .map-loader .cell:nth-child(6) { animation-delay: 0.5s; }
+        .map-loader .cell:nth-child(7) { animation-delay: 0.6s; }
+        .map-loader .cell:nth-child(8) { animation-delay: 0.7s; }
+        .map-loader .cell:nth-child(9) { animation-delay: 0.8s; }
+
+        @keyframes cellGlow {
+            0%, 70%, 100% {
+                background: #2a2a34;
+                box-shadow: none;
+                transform: scale(1);
+            }
+            35% {
+                background: #7cb342;
+                box-shadow: 0 0 10px rgba(124, 179, 66, 0.8);
+                transform: scale(1.08);
+            }
+        }
+
+        /* 全屏加载遮罩 */
+        #global-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #1a1a1f;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            transition: opacity 0.4s ease;
+        }
+
+        #global-loader.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #global-loader .loader-text {
+            font-size: 14px;
+            color: #7cb342;
+            letter-spacing: 2px;
+        }
+
+        /* 地图区域局部加载 */
+        #map-loader-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(16, 16, 20, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 15;
+            pointer-events: none;
+        }
+
+        #map-loader-overlay.active {
+            display: flex;
         }
 
         .zoom-hint {
@@ -619,6 +796,15 @@
     </style>
 </head>
 <body>
+<div id="global-loader">
+    <div class="map-loader">
+        <div class="cell"></div><div class="cell"></div><div class="cell"></div>
+        <div class="cell"></div><div class="cell"></div><div class="cell"></div>
+        <div class="cell"></div><div class="cell"></div><div class="cell"></div>
+    </div>
+    <div class="loader-text">正在加载地图…</div>
+</div>
+
 <header id="header">
     <button id="menu-toggle" title="菜单">☰</button>
     <h1>MapWeb 地图</h1>
@@ -650,7 +836,15 @@
 
 <div id="map-container">
     <img id="map-image" alt="服务器地图" style="display:none;">
+    <canvas id="map-canvas" style="display:none;"></canvas>
     <div id="entity-layer"></div>
+    <div id="map-loader-overlay">
+        <div class="map-loader">
+            <div class="cell"></div><div class="cell"></div><div class="cell"></div>
+            <div class="cell"></div><div class="cell"></div><div class="cell"></div>
+            <div class="cell"></div><div class="cell"></div><div class="cell"></div>
+        </div>
+    </div>
     <div id="empty-tip">当前世界没有已加载的区块</div>
     <div class="zoom-hint">滚轮/双指缩放 · 拖动平移</div>
     <div id="entity-legend">
@@ -663,10 +857,21 @@
 <div id="three-container">
     <canvas id="three-canvas"></canvas>
     <div id="three-status">3D 视图加载中…</div>
-    <div id="three-hint">左键拖动旋转 · 滚轮缩放 · 右键平移</div>
+    <div id="three-hint">鼠标：左键旋转 · 滚轮缩放 · 右键平移　|　触屏：单指旋转 · 双指缩放 · 三指平移</div>
     <button id="texture-upload-btn" class="secondary">上传材质包</button>
     <div id="texture-info"></div>
     <input type="file" id="texture-file-input" accept=".zip" style="display:none;">
+</div>
+
+<div id="texture-required-modal">
+    <div id="texture-required-box">
+        <h2>需要材质包</h2>
+        <p>服务器未提供材质包，且自动下载失败。</p>
+        <p>请上传一个 Minecraft 材质包（zip 格式），用于 3D 地图渲染。</p>
+        <button id="texture-required-upload">选择材质包并上传</button>
+        <div id="texture-required-status"></div>
+        <div class="note">材质包仅保存在你的浏览器本地，不会上传到服务器。</div>
+    </div>
 </div>
 
 <div id="player-panel">
@@ -747,6 +952,33 @@
     var mapImage = document.getElementById('map-image');
     var emptyTip = document.getElementById('empty-tip');
     var container = document.getElementById('map-container');
+    var globalLoader = document.getElementById('global-loader');
+    var mapLoaderOverlay = document.getElementById('map-loader-overlay');
+
+    // 隐藏全屏加载遮罩
+    function hideGlobalLoader() {
+        if (globalLoader) {
+            globalLoader.classList.add('hidden');
+            setTimeout(function () {
+                globalLoader.style.display = 'none';
+            }, 400);
+        }
+    }
+
+    // 显示/隐藏地图区域加载遮罩
+    function showMapLoader() {
+        if (mapLoaderOverlay) {
+            mapLoaderOverlay.classList.add('active');
+        }
+    }
+
+    function hideMapLoader() {
+        if (mapLoaderOverlay) {
+            mapLoaderOverlay.classList.remove('active');
+        }
+        // 首次地图渲染完成后，同时隐藏全屏遮罩
+        hideGlobalLoader();
+    }
 
     var consolePanel = document.getElementById('console-panel');
     var consoleFab = document.getElementById('console-fab');
@@ -827,25 +1059,11 @@
         if (!currentWorld) {
             return;
         }
-        var url = '/map.png?world=' + encodeURIComponent(currentWorld)
-            + '&mode=' + (isometric ? 'iso' : 'top')
-            + '&t=' + Date.now();
-        var img = new Image();
-        img.onload = function () {
-            mapImage.src = url;
-            mapImage.style.display = 'block';
-            emptyTip.style.display = 'none';
-            statusEl.textContent = '世界：' + currentWorld + ' · ' + new Date().toLocaleTimeString();
-            // 地图尺寸变化后重新绘制生物圆点
-            loadEntities();
-        };
-        img.onerror = function () {
-            mapImage.style.display = 'none';
-            emptyTip.style.display = 'block';
-            statusEl.textContent = '世界：' + currentWorld + ' · 暂无数据';
-            entityLayer.innerHTML = '';
-        };
-        img.src = url;
+        // 2D 使用前端 WebGL 渲染（带材质），失败时回退到服务端 PNG
+        emptyTip.style.display = 'none';
+        showMapLoader();
+        loadMap2D();
+        loadEntities();
     }
 
     function startTimer() {
@@ -1059,13 +1277,40 @@
         for (var s = 0; s < 36; s++) {
             var item = slotMap[s];
             if (item) {
+                var texUrl = resolveItemTexture(item.tex);
+                var iconHtml;
+                if (texUrl) {
+                    iconHtml = '<img class="inv-icon" src="' + texUrl + '" alt="">';
+                } else {
+                    iconHtml = '<span class="inv-text">' + escapeHtml(shortName(item.type)) + '</span>';
+                }
                 html += '<div class="inv-slot filled" title="' + escapeHtml(item.type) + '">'
-                    + escapeHtml(shortName(item.type)) + ' x' + item.amount + '</div>';
+                    + iconHtml
+                    + (item.amount > 1 ? '<span class="inv-count">' + item.amount + '</span>' : '')
+                    + '</div>';
             } else {
                 html += '<div class="inv-slot"></div>';
             }
         }
         inventoryGrid.innerHTML = html;
+    }
+
+    // 解析物品材质 URL（大小写不敏感匹配）
+    function resolveItemTexture(texName) {
+        if (!texName) {
+            return null;
+        }
+        var lower = texName.toLowerCase();
+        // 在 textureCache 里做大小写不敏感查找
+        for (var key in textureCache) {
+            if (textureCache.hasOwnProperty(key) && key.toLowerCase() === lower) {
+                var tex = textureCache[key];
+                if (tex && tex.image && tex.image.src) {
+                    return tex.image.src;
+                }
+            }
+        }
+        return null;
     }
 
     function shortName(type) {
@@ -1113,18 +1358,19 @@
             return;
         }
 
-        // 地图图片的实际渲染尺寸
-        var imgW = mapImage.offsetWidth;
-        var imgH = mapImage.offsetHeight;
+        // 取当前显示的地图元素（canvas 或 img）
+        var mapEl = (mapCanvas.style.display === 'block') ? mapCanvas : mapImage;
+        var imgW = mapEl.offsetWidth;
+        var imgH = mapEl.offsetHeight;
         if (imgW === 0 || imgH === 0) {
             return;
         }
 
-        // 让叠加层与地图图片尺寸、位置完全一致，共用同一个 transform
+        // 让叠加层与地图元素尺寸、位置完全一致，共用同一个 transform
         entityLayer.style.width = imgW + 'px';
         entityLayer.style.height = imgH + 'px';
-        entityLayer.style.left = mapImage.offsetLeft + 'px';
-        entityLayer.style.top = mapImage.offsetTop + 'px';
+        entityLayer.style.left = mapEl.offsetLeft + 'px';
+        entityLayer.style.top = mapEl.offsetTop + 'px';
 
         var html = '';
         for (var i = 0; i < entities.length; i++) {
@@ -1165,6 +1411,7 @@
     function applyTransform() {
         var t = 'translate(' + offsetX + 'px,' + offsetY + 'px) scale(' + scale + ')';
         mapImage.style.transform = t;
+        mapCanvas.style.transform = t;
         entityLayer.style.transform = t;
     }
 
@@ -1445,6 +1692,99 @@
             camRadius = Math.max(10, Math.min(600, camRadius));
             updateCamera();
         }, { passive: false });
+
+        // ============ 触摸控制（手机端） ============
+        var touchLastX = 0, touchLastY = 0;
+        var touchPinchDist = 0;
+        var touchMode = 0; // 0=无 1=单指旋转 2=双指缩放 3=三指平移
+
+        threeCanvas.addEventListener('touchstart', function (e) {
+            if (e.touches.length === 1) {
+                touchMode = 1;
+                touchLastX = e.touches[0].clientX;
+                touchLastY = e.touches[0].clientY;
+            } else if (e.touches.length === 2) {
+                touchMode = 2;
+                touchPinchDist = touchDistance(e.touches[0], e.touches[1]);
+            } else if (e.touches.length === 3) {
+                touchMode = 3;
+                touchLastX = touchCenterX(e.touches);
+                touchLastY = touchCenterY(e.touches);
+            }
+        }, { passive: false });
+
+        threeCanvas.addEventListener('touchmove', function (e) {
+            e.preventDefault();
+            if (touchMode === 1 && e.touches.length === 1) {
+                // 单指旋转
+                var dx = e.touches[0].clientX - touchLastX;
+                var dy = e.touches[0].clientY - touchLastY;
+                touchLastX = e.touches[0].clientX;
+                touchLastY = e.touches[0].clientY;
+                camTheta -= dx * 0.01;
+                camPhi -= dy * 0.01;
+                camPhi = Math.max(0.1, Math.min(Math.PI - 0.1, camPhi));
+                updateCamera();
+            } else if (touchMode === 2 && e.touches.length === 2) {
+                // 双指缩放
+                var dist = touchDistance(e.touches[0], e.touches[1]);
+                if (touchPinchDist > 0) {
+                    var ratio = touchPinchDist / dist;
+                    camRadius *= ratio;
+                    camRadius = Math.max(10, Math.min(600, camRadius));
+                    updateCamera();
+                }
+                touchPinchDist = dist;
+            } else if (touchMode === 3 && e.touches.length === 3) {
+                // 三指平移
+                var cx = touchCenterX(e.touches);
+                var cy = touchCenterY(e.touches);
+                var mdx = cx - touchLastX;
+                var mdy = cy - touchLastY;
+                touchLastX = cx;
+                touchLastY = cy;
+                camTarget.x -= mdx * 0.3;
+                camTarget.z -= mdy * 0.3;
+                updateCamera();
+            }
+        }, { passive: false });
+
+        threeCanvas.addEventListener('touchend', function (e) {
+            if (e.touches.length === 0) {
+                touchMode = 0;
+            } else if (e.touches.length === 2) {
+                // 三指变双指，切换为缩放
+                touchMode = 2;
+                touchPinchDist = touchDistance(e.touches[0], e.touches[1]);
+            } else if (e.touches.length === 1) {
+                // 变单指，切换为旋转
+                touchMode = 1;
+                touchLastX = e.touches[0].clientX;
+                touchLastY = e.touches[0].clientY;
+            }
+        });
+
+        function touchDistance(t1, t2) {
+            var dx = t1.clientX - t2.clientX;
+            var dy = t1.clientY - t2.clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function touchCenterX(touches) {
+            var sum = 0;
+            for (var i = 0; i < touches.length; i++) {
+                sum += touches[i].clientX;
+            }
+            return sum / touches.length;
+        }
+
+        function touchCenterY(touches) {
+            var sum = 0;
+            for (var i = 0; i < touches.length; i++) {
+                sum += touches[i].clientY;
+            }
+            return sum / touches.length;
+        }
     }
 
     // ============ 材质管理 ============
@@ -1453,6 +1793,37 @@
     var textureUploadBtn = document.getElementById('texture-upload-btn');
     var textureFileInput = document.getElementById('texture-file-input');
     var textureInfo = document.getElementById('texture-info');
+    var textureRequiredModal = document.getElementById('texture-required-modal');
+    var textureRequiredUpload = document.getElementById('texture-required-upload');
+    var textureRequiredStatus = document.getElementById('texture-required-status');
+    var serverTextureLoaded = false;   // 服务端是否有材质
+    var localTextureLoaded = false;    // 本地是否有材质
+    var textureCheckDone = false;      // 材质检查是否完成
+
+    // 检查是否需要弹窗要求上传材质包
+    function checkTextureRequirement() {
+        if (!textureCheckDone) {
+            return;
+        }
+        if (!serverTextureLoaded && !localTextureLoaded) {
+            // 服务端和本地都没有材质，强制弹窗
+            textureRequiredModal.classList.add('open');
+        } else {
+            textureRequiredModal.classList.remove('open');
+        }
+    }
+
+    // 贴图全部加载完成后，重绘当前视图
+    function onTexturesReady() {
+        if (!currentWorld) {
+            return;
+        }
+        if (isometric) {
+            loadThreeView();
+        } else {
+            loadMap2D();
+        }
+    }
 
     // 从服务端加载材质清单和贴图
     function loadServerTextures() {
@@ -1460,14 +1831,20 @@
             .then(function (res) { return res.json(); })
             .then(function (data) {
                 if (!data.loaded) {
+                    serverTextureLoaded = false;
                     textureInfo.style.display = 'block';
                     textureInfo.textContent = '服务端无材质包，使用纯色';
+                    textureCheckDone = true;
+                    checkTextureRequirement();
                     return;
                 }
+                serverTextureLoaded = true;
                 var names = data.textures || [];
                 textureInfo.style.display = 'block';
                 textureInfo.textContent = '服务端材质 ' + names.length + ' 个';
                 var loader = new THREE.TextureLoader();
+                var loadedCount = 0;
+                var total = names.length;
                 for (var i = 0; i < names.length; i++) {
                     (function (name) {
                         loader.load('/api/textures/' + encodeURIComponent(name) + '.png',
@@ -1475,16 +1852,33 @@
                                 tex.magFilter = THREE.NearestFilter;
                                 tex.minFilter = THREE.NearestFilter;
                                 textureCache[name] = tex;
+                                loadedCount++;
+                                // 全部加载完成后重绘地图
+                                if (loadedCount >= total) {
+                                    onTexturesReady();
+                                }
                             },
                             undefined,
                             function () {
-                                // 单个贴图加载失败忽略
+                                // 单个贴图加载失败也计数，避免卡住
+                                loadedCount++;
+                                if (loadedCount >= total) {
+                                    onTexturesReady();
+                                }
                             });
                     })(names[i]);
                 }
+                if (total === 0) {
+                    onTexturesReady();
+                }
+                textureCheckDone = true;
+                checkTextureRequirement();
             })
             .catch(function () {
-                // 忽略
+                // 请求失败，视为服务端无材质
+                serverTextureLoaded = false;
+                textureCheckDone = true;
+                checkTextureRequirement();
             });
     }
 
@@ -1509,6 +1903,9 @@
                 getAll.onsuccess = function () {
                     var keys = getAll.result || [];
                     if (keys.length === 0) {
+                        localTextureLoaded = false;
+                        textureCheckDone = true;
+                        checkTextureRequirement();
                         return;
                     }
                     var getReq = store.getAll();
@@ -1525,18 +1922,35 @@
                                 });
                             })(keys[i], values[i]);
                         }
+                        localTextureLoaded = true;
                         textureInfo.style.display = 'block';
                         textureInfo.textContent = '本地材质 ' + keys.length + ' 个（覆盖服务端）';
+                        textureCheckDone = true;
+                        checkTextureRequirement();
+                        // 本地贴图加载完成后重绘
+                        setTimeout(onTexturesReady, 300);
                     };
                 };
             } catch (err) {
-                // 忽略
+                localTextureLoaded = false;
+                textureCheckDone = true;
+                checkTextureRequirement();
             }
+        };
+        req.onerror = function () {
+            localTextureLoaded = false;
+            textureCheckDone = true;
+            checkTextureRequirement();
         };
     }
 
     // 上传材质包
     textureUploadBtn.addEventListener('click', function () {
+        textureFileInput.click();
+    });
+
+    // 弹窗里的上传按钮
+    textureRequiredUpload.addEventListener('click', function () {
         textureFileInput.click();
     });
 
@@ -1555,37 +1969,62 @@
         }
         textureInfo.style.display = 'block';
         textureInfo.textContent = '正在解析材质包…';
+        textureRequiredStatus.textContent = '正在解析材质包…';
 
         var reader = new FileReader();
         reader.onload = function (e) {
             if (typeof JSZip === 'undefined') {
                 textureInfo.textContent = 'JSZip 加载失败';
+                textureRequiredStatus.textContent = 'JSZip 加载失败，请检查网络';
                 return;
             }
             JSZip.loadAsync(e.target.result).then(function (zip) {
-                var prefix = 'assets/minecraft/textures/blocks/';
+                var marker = 'textures/blocks/';
                 var tasks = [];
                 var count = 0;
                 zip.forEach(function (path, entry) {
                     if (entry.dir) {
                         return;
                     }
-                    if (path.indexOf(prefix) !== 0 || !path.endsWith('.png')) {
+                    if (!path.endsWith('.png')) {
                         return;
                     }
-                    var name = path.substring(prefix.length, path.length - 4);
+                    var markerIndex = path.indexOf(marker);
+                    if (markerIndex < 0) {
+                        return;
+                    }
+                    var name = path.substring(markerIndex + marker.length, path.length - 4);
+                    // 跳过子目录中的贴图
+                    if (name.indexOf('/') >= 0) {
+                        return;
+                    }
                     tasks.push(entry.async('blob').then(function (blob) {
                         localTextures[name] = blob;
                         count++;
                     }));
                 });
                 Promise.all(tasks).then(function () {
+                    if (count === 0) {
+                        textureRequiredStatus.textContent = '材质包内没有找到方块贴图，请确认是标准材质包';
+                        return;
+                    }
                     saveLocalTextures(localTextures);
                     applyLocalTextures(localTextures);
                     textureInfo.textContent = '本地材质 ' + count + ' 个（覆盖服务端）';
+                    textureRequiredStatus.textContent = '上传成功，共 ' + count + ' 个贴图';
+                    // 标记本地已有材质，关闭弹窗
+                    localTextureLoaded = true;
+                    checkTextureRequirement();
+                    // 自动切到 3D 视图
+                    if (!isometric) {
+                        viewToggle.click();
+                    } else {
+                        loadThreeView();
+                    }
                 });
             }).catch(function () {
                 textureInfo.textContent = '材质包解析失败';
+                textureRequiredStatus.textContent = '材质包解析失败，请确认文件完整';
             });
         };
         reader.readAsArrayBuffer(file);
@@ -1623,6 +2062,13 @@
     // 应用本地材质（覆盖服务端）
     function applyLocalTextures(textures) {
         var loader = new THREE.TextureLoader();
+        var loadedCount = 0;
+        var total = 0;
+        for (var c in textures) {
+            if (textures.hasOwnProperty(c)) {
+                total++;
+            }
+        }
         for (var name in textures) {
             if (!textures.hasOwnProperty(name)) {
                 continue;
@@ -1633,9 +2079,171 @@
                     tex.magFilter = THREE.NearestFilter;
                     tex.minFilter = THREE.NearestFilter;
                     textureCache[n] = tex;
+                    loadedCount++;
+                    if (loadedCount >= total) {
+                        onTexturesReady();
+                    }
                 });
             })(name, textures[name]);
         }
+    }
+
+    // ============ 2D WebGL 渲染 ============
+    var mapCanvas = document.getElementById('map-canvas');
+    var map2dRenderer = null;
+    var map2dScene = null;
+    var map2dCamera = null;
+    var map2dMeshes = [];
+    var map2dReady = false;
+    var map2dData = null;
+
+    function initMap2D() {
+        if (map2dReady) {
+            return true;
+        }
+        if (typeof THREE === 'undefined') {
+            return false;
+        }
+        map2dScene = new THREE.Scene();
+        map2dCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
+        // 相机稍微偏移，避免完全垂直导致的朝向退化
+        map2dCamera.position.set(0, 100, 0.01);
+        map2dCamera.up.set(0, 0, -1);
+        map2dCamera.lookAt(0, 0, 0);
+        map2dRenderer = new THREE.WebGLRenderer({ canvas: mapCanvas, antialias: false });
+        map2dRenderer.setPixelRatio(1);
+        map2dReady = true;
+        return true;
+    }
+
+    // 加载俯视数据并用 WebGL 渲染
+    function loadMap2D() {
+        if (!currentWorld) {
+            return;
+        }
+        if (!initMap2D()) {
+            // WebGL 不可用，回退到服务端 PNG
+            fallbackToPng();
+            return;
+        }
+        fetch('/api/topdown?world=' + encodeURIComponent(currentWorld))
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (!data.success) {
+                    fallbackToPng();
+                    return;
+                }
+                renderMap2D(data);
+            })
+            .catch(function () {
+                fallbackToPng();
+            });
+    }
+
+    // 回退到服务端 PNG 渲染
+    function fallbackToPng() {
+        mapCanvas.style.display = 'none';
+        mapImage.style.display = 'block';
+        var url = '/map.png?world=' + encodeURIComponent(currentWorld)
+            + '&mode=top&t=' + Date.now();
+        mapImage.onload = function () {
+            hideMapLoader();
+        };
+        mapImage.onerror = function () {
+            hideMapLoader();
+        };
+        mapImage.src = url;
+        statusEl.textContent = '世界：' + currentWorld + '（PNG 模式）';
+    }
+
+    function renderMap2D(data) {
+        map2dData = data;
+        // 清理旧内容
+        for (var i = 0; i < map2dMeshes.length; i++) {
+            map2dScene.remove(map2dMeshes[i]);
+            if (map2dMeshes[i].geometry) {
+                map2dMeshes[i].geometry.dispose();
+            }
+            if (map2dMeshes[i].material) {
+                map2dMeshes[i].material.dispose();
+            }
+        }
+        map2dMeshes = [];
+
+        var tiles = data.tiles || [];
+        if (tiles.length === 0) {
+            fallbackToPng();
+            return;
+        }
+
+        // 按材质分组
+        var groups = {};
+        for (var t = 0; t < tiles.length; t++) {
+            var tile = tiles[t];
+            var key;
+            if (tile.t && textureCache[tile.t]) {
+                key = 'tex:' + tile.t;
+            } else {
+                key = 'color:' + tile.c;
+            }
+            if (!groups[key]) {
+                groups[key] = { texture: tile.t, color: tile.c, list: [] };
+            }
+            groups[key].list.push(tile);
+        }
+
+        var geometry = new THREE.PlaneGeometry(1, 1);
+        var dummy = new THREE.Object3D();
+        var mapW = data.mapWidth;
+        var mapH = data.mapHeight;
+
+        for (var key in groups) {
+            if (!groups.hasOwnProperty(key)) {
+                continue;
+            }
+            var group = groups[key];
+            var material;
+            if (group.texture && textureCache[group.texture]) {
+                var tex = textureCache[group.texture];
+                tex.magFilter = THREE.NearestFilter;
+                tex.minFilter = THREE.NearestFilter;
+                material = new THREE.MeshBasicMaterial({ map: tex });
+            } else {
+                material = new THREE.MeshBasicMaterial({ color: group.color });
+            }
+
+            var mesh = new THREE.InstancedMesh(geometry, material, group.list.length);
+            for (var k = 0; k < group.list.length; k++) {
+                var g = group.list[k];
+                // 居中：x 向右，z 向下（俯视）
+                dummy.position.set(g.x - mapW / 2 + 0.5, 0, g.z - mapH / 2 + 0.5);
+                dummy.rotation.x = -Math.PI / 2;
+                dummy.updateMatrix();
+                mesh.setMatrixAt(k, dummy.matrix);
+            }
+            mesh.instanceMatrix.needsUpdate = true;
+            map2dScene.add(mesh);
+            map2dMeshes.push(mesh);
+        }
+
+        // 设置正交相机范围
+        map2dCamera.left = -mapW / 2;
+        map2dCamera.right = mapW / 2;
+        map2dCamera.top = -mapH / 2;
+        map2dCamera.bottom = mapH / 2;
+        map2dCamera.updateProjectionMatrix();
+
+        // 设置 canvas 尺寸（每个区块 16 像素）
+        var pxPerChunk = 16;
+        mapCanvas.width = mapW * pxPerChunk;
+        mapCanvas.height = mapH * pxPerChunk;
+        map2dRenderer.setSize(mapCanvas.width, mapCanvas.height, false);
+
+        mapCanvas.style.display = 'block';
+        mapImage.style.display = 'none';
+        map2dRenderer.render(map2dScene, map2dCamera);
+        statusEl.textContent = '世界：' + currentWorld + ' · 方块 ' + tiles.length;
+        hideMapLoader();
     }
 
     function loadThreeView() {
@@ -1828,6 +2436,8 @@
     loadEntities();
     loadServerTextures();
     loadLocalTextures();
+    // 兜底：最多 15 秒后强制隐藏全屏遮罩，避免卡死
+    setTimeout(hideGlobalLoader, 15000);
 </script>
 </body>
 </html>

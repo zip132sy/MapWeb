@@ -83,6 +83,8 @@ public class WebHandler implements HttpHandler {
                 handleInventory(exchange);
             } else if ("/api/voxels".equals(path)) {
                 handleVoxels(exchange);
+            } else if ("/api/topdown".equals(path)) {
+                handleTopDown(exchange);
             } else if ("/api/textures/manifest".equals(path)) {
                 handleTextureManifest(exchange);
             } else if (path.startsWith("/api/textures/")) {
@@ -477,6 +479,9 @@ public class WebHandler implements HttpHandler {
             sb.append(",\"type\":\"").append(escapeJson(item.getType().name())).append("\"");
             sb.append(",\"amount\":").append(item.getAmount());
             sb.append(",\"durability\":").append(item.getDurability());
+            // 材质名：类型名转小写，前端优先匹配 items/，再匹配 blocks/
+            String texName = item.getType().name().toLowerCase();
+            sb.append(",\"tex\":\"").append(escapeJson(texName)).append("\"");
             sb.append("}");
         }
 
@@ -665,6 +670,123 @@ public class WebHandler implements HttpHandler {
         }
         sb.append("]}");
 
+        return sb.toString();
+    }
+
+    /**
+     * 俯视方块数据接口（供前端 WebGL 渲染 2D 地图）。
+     * 参数：world=世界名
+     * 返回每个区块中心列最高方块的材质名、颜色、高度。
+     */
+    private void handleTopDown(HttpExchange exchange) throws IOException {
+        Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
+        String worldName = query.get("world");
+        if (worldName == null || worldName.isEmpty()) {
+            worldName = config.getDefaultWorld();
+        }
+
+        World world = Bukkit.getWorld(worldName);
+        if (world == null) {
+            sendJson(exchange, "{\"success\":false,\"message\":\"世界不存在\"}");
+            return;
+        }
+
+        final World targetWorld = world;
+        FutureTask<String> task = new FutureTask<String>(new Callable<String>() {
+            @Override
+            public String call() {
+                return buildTopDownJson(targetWorld);
+            }
+        });
+
+        String json;
+        try {
+            if (Bukkit.isPrimaryThread()) {
+                json = buildTopDownJson(targetWorld);
+            } else {
+                Bukkit.getScheduler().runTask(plugin, task);
+                json = task.get();
+            }
+        } catch (Exception e) {
+            json = "{\"success\":false,\"message\":\"提取俯视数据失败\"}";
+        }
+
+        sendJson(exchange, json);
+    }
+
+    /**
+     * 构建俯视方块 JSON（必须在主线程生成快照）。
+     */
+    private String buildTopDownJson(World world) {
+        org.bukkit.Chunk[] chunks = world.getLoadedChunks();
+        if (chunks == null || chunks.length == 0) {
+            return "{\"success\":false,\"message\":\"没有已加载的区块\"}";
+        }
+
+        int minChunkX = Integer.MAX_VALUE;
+        int maxChunkX = Integer.MIN_VALUE;
+        int minChunkZ = Integer.MAX_VALUE;
+        int maxChunkZ = Integer.MIN_VALUE;
+        for (org.bukkit.Chunk chunk : chunks) {
+            if (chunk.getX() < minChunkX) {
+                minChunkX = chunk.getX();
+            }
+            if (chunk.getX() > maxChunkX) {
+                maxChunkX = chunk.getX();
+            }
+            if (chunk.getZ() < minChunkZ) {
+                minChunkZ = chunk.getZ();
+            }
+            if (chunk.getZ() > maxChunkZ) {
+                maxChunkZ = chunk.getZ();
+            }
+        }
+        int mapWidth = maxChunkX - minChunkX + 1;
+        int mapHeight = maxChunkZ - minChunkZ + 1;
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"success\":true");
+        sb.append(",\"minChunkX\":").append(minChunkX);
+        sb.append(",\"minChunkZ\":").append(minChunkZ);
+        sb.append(",\"mapWidth\":").append(mapWidth);
+        sb.append(",\"mapHeight\":").append(mapHeight);
+        sb.append(",\"tiles\":[");
+
+        boolean first = true;
+        for (org.bukkit.Chunk chunk : chunks) {
+            int cx = chunk.getX();
+            int cz = chunk.getZ();
+            int centerX = (cx << 4) + 8;
+            int centerZ = (cz << 4) + 8;
+
+            int highestY = world.getHighestBlockYAt(centerX, centerZ);
+            org.bukkit.block.Block block = world.getBlockAt(centerX, highestY, centerZ);
+            int typeId = block.getTypeId();
+            int data = block.getData();
+            int color = com.zip132sy.mapweb.render.BlockColor.getColorById(typeId, data);
+
+            String topTex = null;
+            com.zip132sy.mapweb.texture.BlockTextureMap.Faces faces =
+                    com.zip132sy.mapweb.texture.BlockTextureMap.getFacesById(typeId, data);
+            if (faces != null) {
+                topTex = faces.top;
+            }
+
+            if (!first) {
+                sb.append(",");
+            }
+            first = false;
+            sb.append("{\"x\":").append(cx - minChunkX);
+            sb.append(",\"z\":").append(cz - minChunkZ);
+            sb.append(",\"y\":").append(highestY);
+            sb.append(",\"c\":").append(color);
+            if (topTex != null) {
+                sb.append(",\"t\":\"").append(escapeJson(topTex)).append("\"");
+            }
+            sb.append("}");
+        }
+
+        sb.append("]}");
         return sb.toString();
     }
 

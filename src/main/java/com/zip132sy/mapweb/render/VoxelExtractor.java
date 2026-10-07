@@ -90,7 +90,7 @@ public final class VoxelExtractor {
                         String sideTex = null;
                         String bottomTex = null;
                         com.zip132sy.mapweb.texture.BlockTextureMap.Faces faces =
-                                com.zip132sy.mapweb.texture.BlockTextureMap.getFacesById(typeId);
+                                com.zip132sy.mapweb.texture.BlockTextureMap.getFacesById(typeId, data);
                         if (faces != null) {
                             topTex = faces.top;
                             sideTex = faces.side;

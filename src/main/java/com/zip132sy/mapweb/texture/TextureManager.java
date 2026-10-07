@@ -25,11 +25,15 @@ import java.util.zip.ZipInputStream;
  * 2. 从配置的 URL 自动下载（下载后保存为 textures.zip）
  * 3. 插件 jar 内置的 textures.zip（兜底）
  *
- * 只加载 assets/minecraft/textures/blocks/ 下的 PNG，避免加载无关文件。
+ * 加载路径中包含 textures/blocks/ 或 textures/items/ 的 PNG，避免加载无关文件。
+ * 不硬编码完整前缀，以兼容不同来源的材质包目录结构。
  */
 public class TextureManager {
 
-    private static final String BLOCK_PREFIX = "assets/minecraft/textures/blocks/";
+    /** 方块贴图路径特征（兼容 assets/minecraft/textures/blocks/ 与 textures/blocks/ 等结构） */
+    private static final String BLOCK_MARKER = "textures/blocks/";
+    /** 物品贴图路径特征 */
+    private static final String ITEM_MARKER = "textures/items/";
     /** 单个贴图大小上限，防止恶意超大文件 */
     private static final int MAX_TEXTURE_SIZE = 512 * 1024;
     /** 贴图总数量上限 */
@@ -202,14 +206,29 @@ public class TextureManager {
             if (entry.isDirectory()) {
                 continue;
             }
-            if (!name.startsWith(BLOCK_PREFIX) || !name.endsWith(".png")) {
+            if (!name.endsWith(".png")) {
+                continue;
+            }
+            // 路径中必须包含 textures/blocks/ 或 textures/items/
+            int markerIndex = name.indexOf(BLOCK_MARKER);
+            int markerLen = BLOCK_MARKER.length();
+            if (markerIndex < 0) {
+                markerIndex = name.indexOf(ITEM_MARKER);
+                markerLen = ITEM_MARKER.length();
+            }
+            if (markerIndex < 0) {
                 continue;
             }
             if (textures.size() >= MAX_TEXTURES) {
                 break;
             }
 
-            String textureName = name.substring(BLOCK_PREFIX.length(), name.length() - 4);
+            // 贴图名 = 标记之后、.png 之前的部分
+            String textureName = name.substring(markerIndex + markerLen, name.length() - 4);
+            // 跳过子目录中的贴图，只保留直接位于 blocks/ 或 items/ 下的
+            if (textureName.indexOf('/') >= 0) {
+                continue;
+            }
             byte[] data = readEntry(zis);
             if (data != null && data.length > 0 && data.length <= MAX_TEXTURE_SIZE) {
                 textures.put(textureName, data);

@@ -10,7 +10,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public class PluginConfig {
 
     /** 当前代码期望的配置版本，配置结构变更时需同步提升此值 */
-    public static final int CURRENT_CONFIG_VERSION = 8;
+    public static final int CURRENT_CONFIG_VERSION = 9;
 
     private final JavaPlugin plugin;
 
@@ -42,6 +42,7 @@ public class PluginConfig {
     private int threeDMaxY;
     private int threeDMaxVoxels;
     private java.util.List<String> textureDownloadUrls;
+    private java.util.Map<String, String> customTextureMap;
 
     public PluginConfig(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -83,6 +84,18 @@ public class PluginConfig {
         if (this.textureDownloadUrls == null || this.textureDownloadUrls.isEmpty()) {
             this.textureDownloadUrls = new java.util.ArrayList<String>();
             this.textureDownloadUrls.add("https://github.com/InventivetalentDev/minecraft-assets/archive/refs/heads/1.12.2.zip");
+        }
+        // 自定义方块材质映射（供模组方块使用）
+        this.customTextureMap = new java.util.HashMap<String, String>();
+        org.bukkit.configuration.ConfigurationSection customSection =
+                config.getConfigurationSection("custom-texture-map");
+        if (customSection != null) {
+            for (String key : customSection.getKeys(false)) {
+                String value = customSection.getString(key);
+                if (value != null && !value.trim().isEmpty()) {
+                    this.customTextureMap.put(key, value.trim());
+                }
+            }
         }
         this.consoleEnabled = config.getBoolean("web-console.enabled", true);
         this.sessionTimeout = config.getInt("web-console.session-timeout", 30);
@@ -250,6 +263,10 @@ public class PluginConfig {
 
     public java.util.List<String> getTextureDownloadUrls() {
         return textureDownloadUrls;
+    }
+
+    public java.util.Map<String, String> getCustomTextureMap() {
+        return customTextureMap;
     }
 
     /**
